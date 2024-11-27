@@ -1,69 +1,81 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { Toaster } from 'react-hot-toast';
 import VideoInput from '../components/VideoInput';
 import ArticlePreview from '../components/ArticlePreview';
-import ConversionHistory from '../components/ConversionHistory';
+import PricingPlans from '../components/PricingPlans';
 import Navbar from '../components/Navbar';
 
-export default function Dashboard() {
+export default function DashboardPage() {
   const { data: session, status } = useSession();
-  const router = useRouter();
-  const [articleContent, setArticleContent] = useState('');
-
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login');
-    }
-  }, [status, router]);
+  const [transcription, setTranscription] = useState('');
+  const [showPricing, setShowPricing] = useState(false);
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-indigo-500"></div>
       </div>
     );
   }
 
-  const handleTranscriptionComplete = (transcription: string) => {
-    setArticleContent(transcription);
-  };
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="text-center">
+            <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl md:text-6xl">
+              <span className="block">Welcome to</span>
+              <span className="block text-indigo-600">Tube2Text</span>
+            </h1>
+            <p className="mt-3 max-w-md mx-auto text-base text-gray-500 sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
+              Sign in to start converting your YouTube videos into beautifully formatted articles.
+            </p>
+          </div>
+          <PricingPlans />
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Toaster position="top-right" />
       <Navbar />
       
-      <main className="py-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="space-y-8">
+          {/* Welcome Section */}
           <div className="text-center">
-            <h1 className="text-4xl font-extrabold text-gray-900 sm:text-5xl md:text-6xl">
-              <span className="block">Transform YouTube Videos</span>
-              <span className="block text-indigo-600">Into Readable Articles</span>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Welcome back, {session.user?.name}!
             </h1>
-            <p className="mt-3 max-w-md mx-auto text-base text-gray-500 sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
-              Simply paste a YouTube URL and get an AI-powered article in seconds. Perfect for research, study notes, or content creation.
+            <p className="mt-2 text-sm text-gray-600">
+              Convert your YouTube videos into articles with just one click.
             </p>
           </div>
 
-          <div className="mt-12 bg-white shadow-xl rounded-lg overflow-hidden">
-            <div className="p-6 space-y-8">
-              <VideoInput onTranscriptionComplete={handleTranscriptionComplete} />
-              
-              {articleContent && (
-                <div className="mt-8 border-t pt-8">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-4">Generated Article</h2>
-                  <ArticlePreview content={articleContent} />
-                </div>
-              )}
-              
-              <div className="mt-8 border-t pt-8">
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">Recent Conversions</h2>
-                <ConversionHistory />
-              </div>
-            </div>
+          {/* Main Content */}
+          <div className="grid grid-cols-1 gap-8">
+            <VideoInput onTranscriptionComplete={setTranscription} />
+            {transcription && <ArticlePreview content={transcription} />}
           </div>
+
+          {/* Pricing Section Toggle */}
+          <div className="text-center pt-8">
+            <button
+              onClick={() => setShowPricing(!showPricing)}
+              className="text-indigo-600 hover:text-indigo-500 font-medium"
+            >
+              {showPricing ? 'Hide pricing plans' : 'View pricing plans'}
+            </button>
+          </div>
+
+          {/* Pricing Plans */}
+          {showPricing && <PricingPlans />}
         </div>
       </main>
     </div>

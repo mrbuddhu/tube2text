@@ -1,6 +1,7 @@
-"use client";
+'use client';
 
 import { useState } from 'react';
+import { toast } from 'react-hot-toast';
 
 interface ArticlePreviewProps {
   content: string;
@@ -10,14 +11,28 @@ interface ArticlePreviewProps {
 export default function ArticlePreview({ content, onSave }: ArticlePreviewProps) {
   const [editableContent, setEditableContent] = useState(content);
   const [format, setFormat] = useState<'txt' | 'md' | 'html'>('txt');
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(editableContent);
+      setCopied(true);
+      toast.success('Copied to clipboard!');
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      toast.error('Failed to copy text');
+    }
+  };
 
   const handleDownload = () => {
     let downloadContent = editableContent;
     let extension = 'txt';
+    let contentType = 'text/plain';
 
     if (format === 'md') {
       downloadContent = `# YouTube Video Transcript\n\n${editableContent}`;
       extension = 'md';
+      contentType = 'text/markdown';
     } else if (format === 'html') {
       downloadContent = `
 <!DOCTYPE html>
@@ -30,13 +45,15 @@ export default function ArticlePreview({ content, onSave }: ArticlePreviewProps)
   </style>
 </head>
 <body>
-  ${editableContent.split('\n\n').map(p => `<p>${p}</p>`).join('\n')}
+  <h1>YouTube Video Transcript</h1>
+  ${editableContent.split('\n').map(para => `<p>${para}</p>`).join('\n')}
 </body>
 </html>`;
       extension = 'html';
+      contentType = 'text/html';
     }
 
-    const blob = new Blob([downloadContent], { type: 'text/plain' });
+    const blob = new Blob([downloadContent], { type: contentType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -45,21 +62,17 @@ export default function ArticlePreview({ content, onSave }: ArticlePreviewProps)
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  };
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(editableContent);
-    // Could add a toast notification here
+    toast.success('Download started!');
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-lg">
-      <div className="mb-4 flex justify-between items-center">
-        <div className="space-x-2">
+    <div className="bg-white rounded-lg shadow-lg p-6">
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center space-x-4">
           <select
             value={format}
             onChange={(e) => setFormat(e.target.value as 'txt' | 'md' | 'html')}
-            className="rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            className="rounded-md border-gray-300 text-sm focus:ring-indigo-500 focus:border-indigo-500"
           >
             <option value="txt">Plain Text</option>
             <option value="md">Markdown</option>
@@ -67,32 +80,44 @@ export default function ArticlePreview({ content, onSave }: ArticlePreviewProps)
           </select>
           <button
             onClick={handleDownload}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
           >
+            <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
             Download
           </button>
           <button
             onClick={handleCopy}
-            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+            className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md ${
+              copied
+                ? 'text-green-700 bg-green-100 hover:bg-green-200'
+                : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
+            } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
           >
-            Copy to Clipboard
+            <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {copied ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+              )}
+            </svg>
+            {copied ? 'Copied!' : 'Copy'}
           </button>
         </div>
-        {onSave && (
-          <button
-            onClick={() => onSave(editableContent)}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-          >
-            Save Changes
-          </button>
-        )}
       </div>
-      <textarea
-        value={editableContent}
-        onChange={(e) => setEditableContent(e.target.value)}
-        className="w-full h-96 p-4 border rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm"
-        style={{ lineHeight: '1.6' }}
-      />
+
+      <div className="mt-4">
+        <textarea
+          value={editableContent}
+          onChange={(e) => {
+            setEditableContent(e.target.value);
+            onSave?.(e.target.value);
+          }}
+          className="w-full h-96 p-4 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+          placeholder="Your transcribed text will appear here..."
+        />
+      </div>
     </div>
   );
 }

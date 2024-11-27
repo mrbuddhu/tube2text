@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { getServerSession } from 'next-auth';
 import { YoutubeTranscript } from 'youtube-transcript';
 import axios from 'axios';
 
@@ -51,59 +51,89 @@ const getVideoDuration = async (videoId: string): Promise<number> => {
   }
 };
 
-const extractVideoId = (url: string): string | null => {
+function extractVideoId(url: string): string | null {
   const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/,
-    /youtube\.com\/shorts\/([^&\n?#]+)/
+    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?v=([^&]+)/,
+    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/embed\/([^?]+)/,
+    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/v\/([^?]+)/,
+    /(?:https?:\/\/)?(?:www\.)?youtu\.be\/([^?]+)/
   ];
 
   for (const pattern of patterns) {
     const match = url.match(pattern);
-    if (match && match[1]) {
-      return match[1];
-    }
+    if (match) return match[1];
   }
+
   return null;
-};
-
-const formatTranscript = (transcriptItems: any[]): string => {
-  let formattedText = '';
-  let currentParagraph = '';
-  
-  for (const item of transcriptItems) {
-    const sentence = item.text.trim();
-    if (!sentence) continue;
-
-    // Start a new paragraph after long pauses or when current paragraph is long
-    if (currentParagraph.length > 500 || item.offset > 2000) {
-      if (currentParagraph) {
-        formattedText += currentParagraph.trim() + '\n\n';
-        currentParagraph = '';
-      }
-    }
-
-    // Add the sentence to current paragraph
-    currentParagraph += (currentParagraph ? ' ' : '') + sentence;
-  }
-
-  // Add the last paragraph
-  if (currentParagraph) {
-    formattedText += currentParagraph.trim();
-  }
-
-  return formattedText;
-};
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const { url, isPaidUser } = await request.json();
-    
+    // Check authentication
+    const session = await getServerSession(request);
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    // Parse request body
+    const body = await request.json();
+    const { url, isPaidUser } = body;
+
     if (!url) {
       return NextResponse.json(
-        { error: 'URL is required' },
+        { error: 'YouTube URL is required' },
         { status: 400 }
       );
     }
+
+    // Extract video ID
+    const videoId = extractVideoId(url);
+    if (!videoId) {
+      return NextResponse.json(
+        { error: 'Invalid YouTube URL' },
+        { status: 400 }
+      );
+    }
+
+    console.log('Fetching transcript for video:', videoId);
+
+    // Get transcript
+    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
+    if (!transcript || transcript.length === 0) {
+      return NextResponse.json(
+        { error: 'No transcript available for this video' },
+        { status: 404 }
+      );
+    }
+
+    // Process transcript
+    const content = transcript
+      .map(item => item.text)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // Format into paragraphs (basic formatting)
+    const sentences = content.match(/[^.!?]+[.!?]+/g) || [];
+    const paragraphs = [];
+    let currentParagraph = [];
+
+    for (const sentence of sentences) {
+      currentParagraph.push(sentence.trim());
+      if (currentParagraph.length >= 3) {
+        paragraphs.push(currentParagraph.join(' '));
+        currentParagraph = [];
+      }
+    }
+
+    if (currentParagraph.length > 0) {
+      paragraphs.push(currentParagraph.join(' '));
+    }
+
+    const formattedContent = paragraphs.join('\n\n');
 
     // Check free usage limit
     if (!isPaidUser) {
@@ -120,22 +150,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const videoId = extractVideoId(url);
-    
-    if (!videoId) {
-      return NextResponse.json(
-        { error: 'Invalid YouTube URL' },
-        { status: 400 }
-      );
-    }
-
-    console.log('Fetching transcript for video:', videoId);
-    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
-    
-    if (!transcript || transcript.length === 0) {
-      throw new Error('No transcript available for this video');
-    }
-
     const duration = await getVideoDuration(videoId);
     const maxDuration = isPaidUser ? 4 * 3600 : 300; // 4 hours for paid, 5 minutes for free
 
@@ -150,21 +164,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const totalWords = transcript.reduce((count, item) => 
-      count + item.text.split(/\s+/).length, 0
-    );
-
-    const formattedText = formatTranscript(transcript);
+    const totalWords = formattedContent.split(/\s+/).length;
 
     // Increment usage count for free users
     if (!isPaidUser) {
       await incrementFreeUsage();
     }
 
+    // Return formatted transcript
     return NextResponse.json({
-      success: true,
-      content: formattedText,
+      content: formattedContent,
       metadata: {
+        videoId,
         duration: duration,
         wordCount: totalWords,
         transcriptSegments: transcript.length,
@@ -172,23 +183,11 @@ export async function POST(request: NextRequest) {
       }
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Transcription error:', error);
-    
-    let errorMessage = 'Failed to process video';
-    let statusCode = 500;
-
-    if (error.message.includes('No transcript available')) {
-      errorMessage = 'No transcript available for this video. Make sure the video has closed captions enabled.';
-      statusCode = 400;
-    } else if (error.message.includes('Could not find video')) {
-      errorMessage = 'Video not found. Please check the URL and try again.';
-      statusCode = 404;
-    }
-
     return NextResponse.json(
-      { error: errorMessage },
-      { status: statusCode }
+      { error: error instanceof Error ? error.message : 'Failed to process video' },
+      { status: 500 }
     );
   }
 }
