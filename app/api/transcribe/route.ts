@@ -6,19 +6,19 @@ import axios from 'axios';
 const FREE_USAGE_KEY = 'tube2text_free_usage';
 const MAX_FREE_USES = 2;
 
-const getFreeUsageCount = (): number => {
+const getFreeUsageCount = async (): Promise<number> => {
   try {
-    const usageData = localStorage.getItem(FREE_USAGE_KEY);
-    return usageData ? parseInt(usageData, 10) : 0;
+    const response = await fetch('/api/usage');
+    const usageData = await response.json();
+    return usageData.count;
   } catch {
     return 0;
   }
 };
 
-const incrementFreeUsage = (): void => {
+const incrementFreeUsage = async (): Promise<void> => {
   try {
-    const currentUsage = getFreeUsageCount();
-    localStorage.setItem(FREE_USAGE_KEY, (currentUsage + 1).toString());
+    await fetch('/api/usage', { method: 'POST' });
   } catch {
     // Handle error silently
   }
@@ -52,41 +52,62 @@ const getVideoDuration = async (videoId: string): Promise<number> => {
 };
 
 const extractVideoId = (url: string): string | null => {
-  const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
-  const match = url.match(regex);
-  return match ? match[1] : null;
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/,
+    /youtube\.com\/shorts\/([^&\n?#]+)/
+  ];
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+  return null;
 };
 
 const formatTranscript = (transcriptItems: any[]): string => {
-  let text = '';
+  let formattedText = '';
   let currentParagraph = '';
-  let wordCount = 0;
+  
+  for (const item of transcriptItems) {
+    const sentence = item.text.trim();
+    if (!sentence) continue;
 
-  transcriptItems.forEach((item) => {
-    currentParagraph += item.text + ' ';
-    wordCount += item.text.split(/\s+/).length;
-
-    if (wordCount >= 50 || item.duration > 2.5) {
-      text += currentParagraph.trim() + '\n\n';
-      currentParagraph = '';
-      wordCount = 0;
+    // Start a new paragraph after long pauses or when current paragraph is long
+    if (currentParagraph.length > 500 || item.offset > 2000) {
+      if (currentParagraph) {
+        formattedText += currentParagraph.trim() + '\n\n';
+        currentParagraph = '';
+      }
     }
-  });
 
-  if (currentParagraph) {
-    text += currentParagraph.trim();
+    // Add the sentence to current paragraph
+    currentParagraph += (currentParagraph ? ' ' : '') + sentence;
   }
 
-  return text;
+  // Add the last paragraph
+  if (currentParagraph) {
+    formattedText += currentParagraph.trim();
+  }
+
+  return formattedText;
 };
 
 export async function POST(request: NextRequest) {
   try {
     const { url, isPaidUser } = await request.json();
     
+    if (!url) {
+      return NextResponse.json(
+        { error: 'URL is required' },
+        { status: 400 }
+      );
+    }
+
     // Check free usage limit
     if (!isPaidUser) {
-      const usageCount = getFreeUsageCount();
+      const usageCount = await getFreeUsageCount();
       if (usageCount >= MAX_FREE_USES) {
         return NextResponse.json(
           { 
@@ -108,6 +129,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log('Fetching transcript for video:', videoId);
+    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
+    
+    if (!transcript || transcript.length === 0) {
+      throw new Error('No transcript available for this video');
+    }
+
     const duration = await getVideoDuration(videoId);
     const maxDuration = isPaidUser ? 4 * 3600 : 300; // 4 hours for paid, 5 minutes for free
 
@@ -122,22 +150,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
-    
-    if (!transcript || transcript.length === 0) {
-      throw new Error('No transcript available for this video');
-    }
-
-    // Increment usage count for free users
-    if (!isPaidUser) {
-      incrementFreeUsage();
-    }
-
     const totalWords = transcript.reduce((count, item) => 
       count + item.text.split(/\s+/).length, 0
     );
 
     const formattedText = formatTranscript(transcript);
+
+    // Increment usage count for free users
+    if (!isPaidUser) {
+      await incrementFreeUsage();
+    }
 
     return NextResponse.json({
       success: true,
@@ -146,15 +168,27 @@ export async function POST(request: NextRequest) {
         duration: duration,
         wordCount: totalWords,
         transcriptSegments: transcript.length,
-        remainingFreeUses: isPaidUser ? null : MAX_FREE_USES - (getFreeUsageCount() + 1)
+        remainingFreeUses: isPaidUser ? null : MAX_FREE_USES - (await getFreeUsageCount())
       }
     });
 
   } catch (error: any) {
-    console.error('Error:', error);
+    console.error('Transcription error:', error);
+    
+    let errorMessage = 'Failed to process video';
+    let statusCode = 500;
+
+    if (error.message.includes('No transcript available')) {
+      errorMessage = 'No transcript available for this video. Make sure the video has closed captions enabled.';
+      statusCode = 400;
+    } else if (error.message.includes('Could not find video')) {
+      errorMessage = 'Video not found. Please check the URL and try again.';
+      statusCode = 404;
+    }
+
     return NextResponse.json(
-      { error: error.message || 'Failed to process video' },
-      { status: 500 }
+      { error: errorMessage },
+      { status: statusCode }
     );
   }
 }

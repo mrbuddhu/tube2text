@@ -73,6 +73,7 @@ export default function VideoInput({ onTranscriptionComplete }: VideoInputProps)
 
     setError('');
     setIsLoading(true);
+    setArticle('');
 
     try {
       const response = await fetch('/api/transcribe', {
@@ -80,26 +81,24 @@ export default function VideoInput({ onTranscriptionComplete }: VideoInputProps)
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url, isPaidUser }),
+        body: JSON.stringify({ url }),
       });
 
-      if (!response.ok) {
-        throw new Error(response.statusText);
-      }
-
       const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to process video');
+      }
 
       setArticle(data.content);
       setMetadata(data.metadata);
       onTranscriptionComplete?.(data.content);
-      saveToHistory(data.content);
       
-      // Show remaining uses for free users
-      if (!isPaidUser && data.metadata.remainingFreeUses !== null) {
-        setError(`You have ${data.metadata.remainingFreeUses} free conversions remaining.`);
-      }
+      // Show success message
+      setError('Transcription completed successfully!');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Transcription error:', err);
+      setError(err instanceof Error ? err.message : 'An error occurred while processing the video');
     } finally {
       setIsLoading(false);
     }
