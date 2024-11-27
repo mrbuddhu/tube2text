@@ -1,4 +1,4 @@
-# Tube2Text
+# Tube2Article
 
 A web application that transforms YouTube videos into readable articles by extracting and processing video content.
 
