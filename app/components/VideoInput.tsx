@@ -20,7 +20,11 @@ interface TranscriptMetadata {
   remainingFreeUses: number | null;
 }
 
-export default function VideoInput() {
+interface VideoInputProps {
+  onTranscriptionComplete?: (transcription: string) => void;
+}
+
+export default function VideoInput({ onTranscriptionComplete }: VideoInputProps) {
   const [url, setUrl] = useState('');
   const [article, setArticle] = useState('');
   const [metadata, setMetadata] = useState<TranscriptMetadata | null>(null);
@@ -56,18 +60,19 @@ export default function VideoInput() {
     localStorage.setItem('tube2text_history', JSON.stringify(updatedHistory));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleTranscribe = async () => {
     if (!isAuthenticated) {
       setShowSignInModal(true);
       return;
     }
 
-    setIsLoading(true);
+    if (!url) {
+      setError('Please enter a YouTube URL');
+      return;
+    }
+
     setError('');
-    setArticle('');
-    setMetadata(null);
+    setIsLoading(true);
 
     try {
       const response = await fetch('/api/transcribe', {
@@ -78,22 +83,23 @@ export default function VideoInput() {
         body: JSON.stringify({ url, isPaidUser }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to process video');
+        throw new Error(response.statusText);
       }
+
+      const data = await response.json();
 
       setArticle(data.content);
       setMetadata(data.metadata);
+      onTranscriptionComplete?.(data.content);
       saveToHistory(data.content);
       
       // Show remaining uses for free users
       if (!isPaidUser && data.metadata.remainingFreeUses !== null) {
         setError(`You have ${data.metadata.remainingFreeUses} free conversions remaining.`);
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setIsLoading(false);
     }
@@ -101,7 +107,7 @@ export default function VideoInput() {
 
   return (
     <div className="max-w-4xl mx-auto p-4">
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={(e) => { e.preventDefault(); handleTranscribe(); }} className="space-y-4">
         <div>
           <label htmlFor="url" className="block text-sm font-medium text-gray-700">
             YouTube Video URL

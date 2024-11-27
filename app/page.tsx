@@ -5,6 +5,13 @@ import Link from 'next/link';
 import Footer from './components/Footer';
 import { useAuth } from './context/AuthContext';
 import { useRouter } from 'next/navigation';
+import { ComponentType } from 'react';
+
+interface Feature {
+  name: string;
+  description: string;
+  icon: ComponentType<{ className?: string; 'aria-hidden'?: string }>;
+}
 
 export default function Home() {
   const { isAuthenticated, isPaidUser } = useAuth();
@@ -195,7 +202,7 @@ export default function Home() {
   );
 }
 
-const features = [
+const features: Feature[] = [
   {
     name: 'AI-Powered Transcription',
     description: 'Advanced AI technology that accurately converts speech to text while maintaining context and meaning.',

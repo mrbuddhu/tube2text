@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import VideoInput from '../components/VideoInput';
@@ -10,6 +10,7 @@ import ConversionHistory from '../components/ConversionHistory';
 export default function Dashboard() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [articleContent, setArticleContent] = useState('');
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -25,6 +26,10 @@ export default function Dashboard() {
     );
   }
 
+  const handleTranscriptionComplete = (transcription: string) => {
+    setArticleContent(transcription);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -38,8 +43,8 @@ export default function Dashboard() {
         </div>
 
         <div className="mt-12 space-y-12">
-          <VideoInput />
-          <ArticlePreview />
+          <VideoInput onTranscriptionComplete={handleTranscriptionComplete} />
+          <ArticlePreview content={articleContent} />
           <ConversionHistory />
         </div>
       </div>
