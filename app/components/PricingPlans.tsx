@@ -56,6 +56,40 @@ const tiers = [
   },
 ];
 
+const pricingPlans = [
+  {
+    name: 'Early Bird Access',
+    price: 149,
+    period: 'year',
+    originalPrice: 249,
+    features: [
+      'Unlimited video transcriptions',
+      'AI-powered article generation',
+      'Export to PDF, Word, Markdown',
+      'Priority email support',
+      'Early access to new features',
+      '40% off regular price',
+      'First 100 spots only'
+    ],
+    cta: 'Get Early Access',
+    highlight: true
+  },
+  {
+    name: 'Regular Access',
+    price: 249,
+    period: 'year',
+    features: [
+      'Unlimited video transcriptions',
+      'AI-powered article generation',
+      'Export to PDF, Word, Markdown',
+      'Standard email support',
+      'Regular feature updates'
+    ],
+    cta: 'Coming Soon',
+    disabled: true
+  }
+];
+
 export default function PricingPlans() {
   const { data: session } = useSession();
 
@@ -135,6 +169,62 @@ export default function PricingPlans() {
                   </li>
                 ))}
               </ul>
+            </div>
+          ))}
+          {pricingPlans.map((plan) => (
+            <div
+              key={plan.name}
+              className={`rounded-3xl p-8 ring-1 ring-gray-200 ${
+                plan.highlight
+                  ? 'bg-gray-900 ring-gray-900'
+                  : 'bg-white'
+              } xl:p-10`}
+            >
+              <div className="flex items-center justify-between gap-x-4">
+                <h3
+                  className={`text-lg font-semibold leading-8 ${
+                    plan.highlight ? 'text-white' : 'text-gray-900'
+                  }`}
+                >
+                  {plan.name}
+                </h3>
+              </div>
+              <p className={`mt-4 text-sm leading-6 ${plan.highlight ? 'text-gray-300' : 'text-gray-600'}`}>
+                {plan.features.map((feature) => (
+                  <span key={feature}>{feature}<br/></span>
+                ))}
+              </p>
+              <p className="mt-6 flex items-baseline gap-x-1">
+                <span
+                  className={`text-4xl font-bold tracking-tight ${
+                    plan.highlight ? 'text-white' : 'text-gray-900'
+                  }`}
+                >
+                  ${plan.price}
+                </span>
+                <span className={`text-sm font-semibold leading-6 ${plan.highlight ? 'text-gray-300' : 'text-gray-600'}`}>
+                  /{plan.period}
+                </span>
+                {plan.originalPrice && (
+                  <span className={`text-sm font-semibold leading-6 ${plan.highlight ? 'text-gray-300' : 'text-gray-600'}`}>
+                    (Original price: ${plan.originalPrice})
+                  </span>
+                )}
+              </p>
+              <a
+                href="#"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`mt-6 block rounded-md px-3 py-2 text-center text-sm font-semibold leading-6 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
+                  plan.highlight
+                    ? 'bg-white text-gray-900 hover:bg-gray-100 focus-visible:outline-white'
+                    : plan.disabled
+                      ? 'bg-gray-200 text-gray-600 hover:bg-gray-200 focus-visible:outline-gray-200'
+                      : 'bg-indigo-600 text-white hover:bg-indigo-500 focus-visible:outline-indigo-600'
+                }`}
+              >
+                {plan.disabled ? plan.cta : 'Get started'}
+              </a>
             </div>
           ))}
         </div>

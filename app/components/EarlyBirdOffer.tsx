@@ -8,7 +8,7 @@ import SpotCounter from './SpotCounter';
 import { useAuth } from '../context/AuthContext';
 
 const LAUNCH_DATE = new Date('2025-01-01');
-const EARLY_BIRD_PRICE = 249;
+const EARLY_BIRD_PRICE = 149;
 
 export function EarlyBirdOffer() {
   const { isAuthenticated } = useAuth();
@@ -36,8 +36,8 @@ export function EarlyBirdOffer() {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-2">
             <Gift className="w-5 h-5 text-blue-600" />
-            <span className="text-lg font-bold text-blue-900">${EARLY_BIRD_PRICE}</span>
-            <span className="text-sm text-gray-500">one-time payment</span>
+            <span className="text-lg font-bold text-blue-900">${EARLY_BIRD_PRICE}/year</span>
+            <span className="text-sm text-gray-500">yearly subscription</span>
           </div>
           <div className="flex items-center space-x-2">
             <Clock className="w-5 h-5 text-blue-600" />
@@ -45,6 +45,24 @@ export function EarlyBirdOffer() {
           </div>
         </div>
         <SpotCounter />
+      </div>
+
+      {/* Pricing Display */}
+      <div className="text-center mb-8">
+        <h2 className="text-3xl font-bold mb-4">Early Bird Special Offer</h2>
+        <p className="text-xl mb-2">
+          <span className="line-through text-gray-400">$249/year</span>{" "}
+          <span className="text-2xl font-bold text-green-600">$149/year</span>
+        </p>
+        <p className="text-sm text-gray-600 mb-4">40% off regular price - Limited Time Offer</p>
+        <div className="flex justify-center items-center space-x-2 mb-4">
+          <span className="text-sm bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+            Save $100/year
+          </span>
+          <span className="text-sm bg-red-100 text-red-800 px-2 py-1 rounded">
+            First 100 spots only
+          </span>
+        </div>
       </div>
 
       {/* Features */}

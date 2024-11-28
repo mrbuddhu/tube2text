@@ -10,7 +10,7 @@ declare global {
   }
 }
 
-const EARLY_BIRD_PRICE = 249;
+const EARLY_BIRD_PRICE = 149.00;
 
 interface PayPalButtonProps {
   onSuccess?: () => void;
@@ -29,15 +29,17 @@ export default function PayPalButton({ onSuccess, onError }: PayPalButtonProps) 
           shape: 'rect',
           label: 'paypal'
         },
-        createOrder: (_: any, actions: any) => {
+        createOrder: (data, actions) => {
           return actions.order.create({
-            purchase_units: [{
-              description: 'Tube2Text Lifetime Access',
-              amount: {
-                currency_code: 'USD',
-                value: EARLY_BIRD_PRICE.toString()
-              }
-            }],
+            purchase_units: [
+              {
+                description: "Tube2Text Early Bird Access - Annual Subscription",
+                amount: {
+                  currency_code: "USD",
+                  value: EARLY_BIRD_PRICE.toString()
+                },
+              },
+            ],
             application_context: {
               shipping_preference: 'NO_SHIPPING'
             }
