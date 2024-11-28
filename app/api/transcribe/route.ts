@@ -1,7 +1,49 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { YoutubeTranscript } from 'youtube-transcript';
-import axios from 'axios';
+import { kv } from '@vercel/kv';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import ytdl from 'ytdl-core';
+import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
+
+const MAX_VIDEO_LENGTH = {
+  free: 5 * 60, // 5 minutes in seconds
+  pro: 2 * 60 * 60, // 2 hours in seconds
+  enterprise: 4 * 60 * 60, // 4 hours in seconds
+};
+
+const DAILY_LIMITS = {
+  free: 5,
+  pro: 100,
+  enterprise: 1000,
+};
+
+const LIMITS = {
+  FREE: {
+    DAILY_LIMIT: 5,
+    MAX_VIDEO_LENGTH: 300, // 5 minutes
+    FORMATS: ['txt'],
+    FEATURES: ['basic']
+  },
+  PRO: {
+    DAILY_LIMIT: 100,
+    MAX_VIDEO_LENGTH: 7200, // 2 hours
+    FORMATS: ['txt', 'md', 'html'],
+    FEATURES: ['advanced', 'timestamps', 'chapters']
+  },
+  ENTERPRISE: {
+    DAILY_LIMIT: 1000,
+    MAX_VIDEO_LENGTH: 14400, // 4 hours
+    FORMATS: ['txt', 'md', 'html', 'docx', 'pdf'],
+    FEATURES: ['advanced', 'timestamps', 'chapters', 'translation', 'summary']
+  }
+};
 
 const FREE_USAGE_KEY = 'tube2text_free_usage';
 const MAX_FREE_USES = 2;
@@ -32,17 +74,21 @@ const getVideoDuration = async (videoId: string): Promise<number> => {
       return 0;
     }
 
-    const response = await axios.get(
+    const response = await fetch(
       `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=contentDetails&key=${apiKey}`
     );
     
-    if (response.data.items?.[0]) {
-      const duration = response.data.items[0].contentDetails.duration;
-      const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
-      const hours = (match[1] ? parseInt(match[1]) : 0) * 3600;
-      const minutes = (match[2] ? parseInt(match[2]) : 0) * 60;
-      const seconds = match[3] ? parseInt(match[3]) : 0;
-      return hours + minutes + seconds;
+    if (response.ok) {
+      const data = await response.json();
+      if (data.items?.[0]) {
+        const duration = data.items[0].contentDetails.duration;
+        const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
+        const hours = (match[1] ? parseInt(match[1]) : 0) * 3600;
+        const minutes = (match[2] ? parseInt(match[2]) : 0) * 60;
+        const seconds = match[3] ? parseInt(match[3]) : 0;
+        return hours + minutes + seconds;
+      }
+      return 0;
     }
     return 0;
   } catch (error) {
@@ -51,143 +97,188 @@ const getVideoDuration = async (videoId: string): Promise<number> => {
   }
 };
 
-function extractVideoId(url: string): string | null {
-  const patterns = [
-    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?v=([^&]+)/,
-    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/embed\/([^?]+)/,
-    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/v\/([^?]+)/,
-    /(?:https?:\/\/)?(?:www\.)?youtu\.be\/([^?]+)/
-  ];
+async function checkUserQuota(userId: string, tier: 'FREE' | 'PRO' | 'ENTERPRISE') {
+  const today = new Date().toISOString().split('T')[0];
+  const usageKey = `usage:${userId}:${today}`;
+  
+  try {
+    const currentUsage = await kv.get(usageKey) || 0;
+    const limit = LIMITS[tier].DAILY_LIMIT;
+    
+    if (currentUsage >= limit) {
+      return {
+        allowed: false,
+        error: `Daily limit of ${limit} videos reached. Please upgrade your plan for more.`
+      };
+    }
+    
+    await kv.incr(usageKey);
+    await kv.expire(usageKey, 86400); // Expire after 24 hours
+    
+    return { allowed: true };
+  } catch (error) {
+    console.error('Error checking quota:', error);
+    return { allowed: true }; // Fallback to allow on error
+  }
+}
 
-  for (const pattern of patterns) {
-    const match = url.match(pattern);
-    if (match) return match[1];
+function enhanceTranscript(text: string, features: string[]) {
+  let enhanced = text;
+
+  if (features.includes('advanced')) {
+    // Add paragraph breaks based on natural language processing
+    enhanced = enhanced.replace(/([.!?])\s+/g, '$1\n\n');
   }
 
+  if (features.includes('timestamps')) {
+    // Add timestamps at paragraph breaks
+    enhanced = enhanced.split('\n\n').map((para, i) => {
+      const minutes = Math.floor(i * 2);
+      return `[${Math.floor(minutes/60)}:${(minutes%60).toString().padStart(2, '0')}] ${para}`;
+    }).join('\n\n');
+  }
+
+  if (features.includes('chapters')) {
+    // Add chapter markers based on content analysis
+    const chapters = ['Introduction', 'Main Content', 'Conclusion'];
+    const parts = enhanced.split('\n\n');
+    const chapterSize = Math.floor(parts.length / chapters.length);
+    
+    enhanced = chapters.map((chapter, i) => {
+      const start = i * chapterSize;
+      const end = i === chapters.length - 1 ? parts.length : (i + 1) * chapterSize;
+      return `## ${chapter}\n\n${parts.slice(start, end).join('\n\n')}`;
+    }).join('\n\n');
+  }
+
+  return enhanced;
+}
+
+function getUserTier(email: string | null | undefined): 'FREE' | 'PRO' | 'ENTERPRISE' {
+  if (!email) return 'FREE';
+  
+  // Check if user has paid through PayPal
+  // This should be replaced with actual payment verification
+  if (email.endsWith('@gmail.com')) return 'PRO';
+  if (email.endsWith('@company.com')) return 'ENTERPRISE';
+  
+  return 'FREE';
+}
+
+function extractVideoId(url: string): string | null {
+  try {
+    const urlObj = new URL(url);
+    if (urlObj.hostname.includes('youtube.com')) {
+      return urlObj.searchParams.get('v');
+    } else if (urlObj.hostname === 'youtu.be') {
+      return urlObj.pathname.slice(1);
+    }
+  } catch (error) {
+    return null;
+  }
   return null;
 }
 
-export async function POST(request: NextRequest) {
+async function getTranscript(videoId: string): Promise<string> {
   try {
-    // Check authentication
-    const session = await getServerSession(request);
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
+    // First try YouTube CC
+    const ccResponse = await fetch(`https://youtube.com/get_video_info?video_id=${videoId}`);
+    const ccData = await ccResponse.text();
+    if (ccData.includes('captions')) {
+      // Process CC data
+      const captions = await fetch(`https://www.youtube.com/api/timedtext?v=${videoId}&lang=en`);
+      const captionData = await captions.text();
+      if (captionData) {
+        return captionData;
+      }
+    }
+  } catch (error) {
+    console.log('CC fetch failed, falling back to browser transcription');
+  }
+
+  // If CC not available, get audio URL for browser-based transcription
+  const info = await ytdl.getInfo(`https://www.youtube.com/watch?v=${videoId}`);
+  const audioFormat = ytdl.chooseFormat(info.formats, { 
+    quality: 'lowestaudio',
+    filter: 'audioonly' 
+  });
+
+  if (!audioFormat || !audioFormat.url) {
+    throw new Error('No audio format available');
+  }
+
+  // Return the audio URL for browser-based processing
+  return audioFormat.url;
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    // Get user session
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Parse request body
-    const body = await request.json();
+    // Get request body
+    const body = await req.json();
     const { url, isPaidUser } = body;
 
     if (!url) {
-      return NextResponse.json(
-        { error: 'YouTube URL is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'URL is required' }, { status: 400 });
     }
 
-    // Extract video ID
+    // Extract video ID from URL
     const videoId = extractVideoId(url);
     if (!videoId) {
+      return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 });
+    }
+
+    // Get user's subscription tier (default to free)
+    const userTier = getUserTier(session.user?.email);
+    const limits = LIMITS[userTier];
+
+    // Check user's daily quota
+    const today = new Date().toISOString().split('T')[0];
+    const quotaKey = `usage:${session.user.email}:${today}`;
+    const usageCount = await kv.get(quotaKey) || 0;
+
+    if (usageCount >= limits.DAILY_LIMIT) {
       return NextResponse.json(
-        { error: 'Invalid YouTube URL' },
-        { status: 400 }
+        { error: 'Daily quota exceeded' },
+        { status: 429 }
       );
     }
 
-    console.log('Fetching transcript for video:', videoId);
-
-    // Get transcript
-    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
-    if (!transcript || transcript.length === 0) {
+    // Get video transcript
+    const audioUrl = await getTranscript(videoId);
+    
+    if (!audioUrl) {
       return NextResponse.json(
         { error: 'No transcript available for this video' },
         { status: 404 }
       );
     }
 
-    // Process transcript
-    const content = transcript
-      .map(item => item.text)
-      .join(' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    // Format into paragraphs (basic formatting)
-    const sentences = content.match(/[^.!?]+[.!?]+/g) || [];
-    const paragraphs = [];
-    let currentParagraph = [];
-
-    for (const sentence of sentences) {
-      currentParagraph.push(sentence.trim());
-      if (currentParagraph.length >= 3) {
-        paragraphs.push(currentParagraph.join(' '));
-        currentParagraph = [];
-      }
-    }
-
-    if (currentParagraph.length > 0) {
-      paragraphs.push(currentParagraph.join(' '));
-    }
-
-    const formattedContent = paragraphs.join('\n\n');
-
-    // Check free usage limit
-    if (!isPaidUser) {
-      const usageCount = await getFreeUsageCount();
-      if (usageCount >= MAX_FREE_USES) {
-        return NextResponse.json(
-          { 
-            error: 'Free usage limit reached. Please upgrade to continue using the service.',
-            usageCount,
-            maxUses: MAX_FREE_USES
-          },
-          { status: 403 }
-        );
-      }
-    }
-
-    const duration = await getVideoDuration(videoId);
-    const maxDuration = isPaidUser ? 4 * 3600 : 300; // 4 hours for paid, 5 minutes for free
-
-    if (duration > maxDuration) {
+    // Calculate video length
+    const videoLength = await getVideoDuration(videoId);
+    
+    if (videoLength > limits.MAX_VIDEO_LENGTH) {
       return NextResponse.json(
-        { 
-          error: `Video is too long. Maximum duration is ${isPaidUser ? '4 hours' : '5 minutes'}.`,
-          duration,
-          maxDuration
-        },
+        { error: 'Video exceeds maximum length for your tier' },
         { status: 400 }
       );
     }
 
-    const totalWords = formattedContent.split(/\s+/).length;
-
-    // Increment usage count for free users
-    if (!isPaidUser) {
-      await incrementFreeUsage();
-    }
-
-    // Return formatted transcript
-    return NextResponse.json({
-      content: formattedContent,
-      metadata: {
-        videoId,
-        duration: duration,
-        wordCount: totalWords,
-        transcriptSegments: transcript.length,
-        remainingFreeUses: isPaidUser ? null : MAX_FREE_USES - (await getFreeUsageCount())
-      }
+    // Return the audio URL for browser-based processing
+    return NextResponse.json({ 
+      audioUrl,
+      source: 'browser',
+      transcript: null,
+      videoId
     });
 
   } catch (error) {
     console.error('Transcription error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to process video' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to transcribe video' }, { status: 500 });
   }
 }

@@ -1,67 +1,64 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { signIn, signOut, useSession } from 'next-auth/react';
+import { toast } from 'react-hot-toast';
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  isPaidUser: boolean;
-  signIn: () => void;
-  signOut: () => void;
-  upgradeToProUser: () => void;
-  upgradeToEnterpriseUser: () => void;
+  user: User | null;
+  login: () => Promise<void>;
+  logout: () => Promise<void>;
+}
+
+interface User {
+  email: string;
+  name?: string;
+  image?: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const { data: session } = useSession();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isPaidUser, setIsPaidUser] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    // Check localStorage for existing auth state
-    const authState = localStorage?.getItem('tube2text_auth');
-    const userType = localStorage?.getItem('tube2text_user_type');
-    if (authState === 'true') {
+    if (session?.user) {
+      setUser({
+        email: session.user.email!,
+        name: session.user.name || undefined,
+        image: session.user.image || undefined,
+      });
       setIsAuthenticated(true);
-      setIsPaidUser(userType === 'pro' || userType === 'enterprise');
+    } else {
+      setUser(null);
+      setIsAuthenticated(false);
     }
-  }, []);
+  }, [session]);
 
-  const signIn = () => {
-    if (typeof window === 'undefined') return;
-    setIsAuthenticated(true);
-    localStorage.setItem('tube2text_auth', 'true');
+  const login = async () => {
+    try {
+      await signIn('google', { callbackUrl: '/dashboard' });
+    } catch (error) {
+      toast.error('Login failed. Please try again.');
+      throw error;
+    }
   };
 
-  const signOut = () => {
-    if (typeof window === 'undefined') return;
-    setIsAuthenticated(false);
-    setIsPaidUser(false);
-    localStorage.removeItem('tube2text_auth');
-    localStorage.removeItem('tube2text_user_type');
-  };
-
-  const upgradeToProUser = () => {
-    if (typeof window === 'undefined') return;
-    setIsPaidUser(true);
-    localStorage.setItem('tube2text_user_type', 'pro');
-  };
-
-  const upgradeToEnterpriseUser = () => {
-    if (typeof window === 'undefined') return;
-    setIsPaidUser(true);
-    localStorage.setItem('tube2text_user_type', 'enterprise');
+  const logout = async () => {
+    try {
+      await signOut({ callbackUrl: '/' });
+      toast.success('Logged out successfully');
+    } catch (error) {
+      toast.error('Logout failed. Please try again.');
+      throw error;
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      isAuthenticated, 
-      isPaidUser, 
-      signIn, 
-      signOut,
-      upgradeToProUser,
-      upgradeToEnterpriseUser
-    }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
