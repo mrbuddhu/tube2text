@@ -9,8 +9,16 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { promisify } from 'util';
+import ffmpeg from 'fluent-ffmpeg';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+import { createWriteStream } from 'fs';
+import { unlink } from 'fs/promises';
+import { exec } from 'child_process';
+import nodeWhisper from 'node-whisper';
+import { EventEmitter } from 'events';
+import { processTranscript } from '@/app/utils/textProcessing';
 
-const execAsync = promisify(exec);
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
 const MAX_VIDEO_LENGTH = {
   free: 5 * 60, // 5 minutes in seconds
@@ -179,36 +187,238 @@ function extractVideoId(url: string): string | null {
   return null;
 }
 
-async function getTranscript(videoId: string): Promise<string> {
+const progressEmitter = new EventEmitter();
+const CACHE_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
+
+interface TranscriptionProgress {
+  status: 'downloading' | 'transcribing' | 'complete' | 'error';
+  progress: number;
+  message?: string;
+}
+
+interface TranscriptionResult {
+  text: string;
+  language?: string;
+  segments?: Array<{
+    start: number;
+    end: number;
+    text: string;
+  }>;
+  cached?: boolean;
+}
+
+interface EnhancedTranscriptionResult extends TranscriptionResult {
+  chapters: Array<{
+    title: string;
+    start: number;
+    end: number;
+    content: string;
+  }>;
+  keywords: string[];
+  summary: string;
+}
+
+async function getCachedTranscript(videoId: string): Promise<TranscriptionResult | null> {
+  try {
+    const cached = await kv.get(`transcript:${videoId}`);
+    if (cached) {
+      return {
+        ...cached,
+        cached: true
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('Cache error:', error);
+    return null;
+  }
+}
+
+async function cacheTranscript(videoId: string, result: TranscriptionResult): Promise<void> {
+  try {
+    await kv.set(`transcript:${videoId}`, result, { ex: CACHE_TTL });
+  } catch (error) {
+    console.error('Cache error:', error);
+  }
+}
+
+async function updateProgress(videoId: string, progress: TranscriptionProgress): Promise<void> {
+  try {
+    await kv.set(`progress:${videoId}`, progress, { ex: 300 }); // 5 minutes TTL
+    progressEmitter.emit(`progress:${videoId}`, progress);
+  } catch (error) {
+    console.error('Progress update error:', error);
+  }
+}
+
+async function downloadAudio(url: string, outputPath: string, videoId: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let progress = 0;
+    ffmpeg(url)
+      .toFormat('mp3')
+      .on('progress', (info) => {
+        progress = Math.min(100, Math.round(info.percent || 0));
+        updateProgress(videoId, {
+          status: 'downloading',
+          progress,
+          message: `Downloading audio: ${progress}%`
+        });
+      })
+      .on('end', () => resolve())
+      .on('error', (err) => reject(err))
+      .save(outputPath);
+  });
+}
+
+async function transcribeAudioLocally(audioPath: string, videoId: string): Promise<TranscriptionResult> {
+  try {
+    // Initialize whisper with the base model (good balance of speed and accuracy)
+    const whisper = await nodeWhisper.whisper({
+      modelName: 'base',
+      language: 'en',
+      debug: true, // Enable progress logging
+      onProgress: (progress) => {
+        updateProgress(videoId, {
+          status: 'transcribing',
+          progress: Math.round(progress * 100),
+          message: `Transcribing: ${Math.round(progress * 100)}%`
+        });
+      }
+    });
+
+    // Transcribe with segments for timestamps
+    const result = await whisper.transcribe(audioPath, {
+      segments: true,
+      timestamps: true
+    });
+
+    return {
+      text: result.text,
+      language: result.language,
+      segments: result.segments?.map(seg => ({
+        start: seg.start,
+        end: seg.end,
+        text: seg.text
+      }))
+    };
+  } catch (error) {
+    console.error('Error in local transcription:', error);
+    throw error;
+  }
+}
+
+async function getTranscript(videoId: string): Promise<EnhancedTranscriptionResult> {
+  // Check cache first
+  const cached = await getCachedTranscript(videoId);
+  if (cached) {
+    return cached as EnhancedTranscriptionResult;
+  }
+
   try {
     // First try YouTube CC
+    updateProgress(videoId, {
+      status: 'downloading',
+      progress: 0,
+      message: 'Checking YouTube captions...'
+    });
+
     const ccResponse = await fetch(`https://youtube.com/get_video_info?video_id=${videoId}`);
     const ccData = await ccResponse.text();
     if (ccData.includes('captions')) {
-      // Process CC data
       const captions = await fetch(`https://www.youtube.com/api/timedtext?v=${videoId}&lang=en`);
       const captionData = await captions.text();
       if (captionData) {
-        return captionData;
+        updateProgress(videoId, {
+          status: 'transcribing',
+          progress: 50,
+          message: 'Processing transcript...'
+        });
+
+        const processed = processTranscript(captionData);
+        const result = {
+          text: captionData,
+          language: 'en',
+          source: 'youtube_cc',
+          ...processed
+        };
+
+        await cacheTranscript(videoId, result);
+        return result;
       }
     }
   } catch (error) {
-    console.log('CC fetch failed, falling back to browser transcription');
+    console.log('CC fetch failed, falling back to local transcription');
   }
 
-  // If CC not available, get audio URL for browser-based transcription
-  const info = await ytdl.getInfo(`https://www.youtube.com/watch?v=${videoId}`);
-  const audioFormat = ytdl.chooseFormat(info.formats, { 
-    quality: 'lowestaudio',
-    filter: 'audioonly' 
-  });
+  // If CC not available, download audio and transcribe locally
+  try {
+    const info = await ytdl.getInfo(`https://www.youtube.com/watch?v=${videoId}`);
+    const audioFormat = ytdl.chooseFormat(info.formats, { 
+      quality: 'lowestaudio',
+      filter: 'audioonly' 
+    });
 
-  if (!audioFormat || !audioFormat.url) {
-    throw new Error('No audio format available');
+    if (!audioFormat || !audioFormat.url) {
+      throw new Error('No audio format available');
+    }
+
+    const tempFile = path.join(os.tmpdir(), `${videoId}.mp3`);
+    
+    // Download and convert audio to mp3
+    await downloadAudio(audioFormat.url, tempFile, videoId);
+
+    // Transcribe using local Whisper model
+    const transcription = await transcribeAudioLocally(tempFile, videoId);
+
+    updateProgress(videoId, {
+      status: 'transcribing',
+      progress: 75,
+      message: 'Processing transcript...'
+    });
+
+    // Process the transcript
+    const processed = processTranscript(transcription.text, transcription.segments);
+    const result = {
+      ...transcription,
+      ...processed
+    };
+
+    // Clean up temp file
+    await unlink(tempFile);
+
+    // Cache the result
+    await cacheTranscript(videoId, result);
+
+    // Update final progress
+    await updateProgress(videoId, {
+      status: 'complete',
+      progress: 100,
+      message: 'Transcription complete!'
+    });
+
+    return result;
+  } catch (error) {
+    await updateProgress(videoId, {
+      status: 'error',
+      progress: 0,
+      message: error.message || 'Failed to transcribe video'
+    });
+    console.error('Error in audio transcription:', error);
+    throw new Error('Failed to transcribe video');
+  }
+}
+
+// Add progress endpoint
+export async function GET(req: NextRequest) {
+  const url = new URL(req.url);
+  const videoId = url.searchParams.get('videoId');
+
+  if (!videoId) {
+    return NextResponse.json({ error: 'Video ID is required' }, { status: 400 });
   }
 
-  // Return the audio URL for browser-based processing
-  return audioFormat.url;
+  const progress = await kv.get(`progress:${videoId}`);
+  return NextResponse.json(progress || { status: 'unknown', progress: 0 });
 }
 
 export async function POST(req: NextRequest) {
@@ -250,9 +460,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Get video transcript
-    const audioUrl = await getTranscript(videoId);
+    const transcript = await getTranscript(videoId);
     
-    if (!audioUrl) {
+    if (!transcript) {
       return NextResponse.json(
         { error: 'No transcript available for this video' },
         { status: 404 }
@@ -269,11 +479,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Return the audio URL for browser-based processing
+    // Return the transcript
     return NextResponse.json({ 
-      audioUrl,
-      source: 'browser',
-      transcript: null,
+      transcript,
       videoId
     });
 

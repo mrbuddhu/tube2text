@@ -1,8 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { signIn, signOut, useSession } from 'next-auth/react';
 import { toast } from 'react-hot-toast';
+import { signIn, signOut } from '../../auth';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -20,23 +20,8 @@ interface User {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { data: session } = useSession();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    if (session?.user) {
-      setUser({
-        email: session.user.email!,
-        name: session.user.name || undefined,
-        image: session.user.image || undefined,
-      });
-      setIsAuthenticated(true);
-    } else {
-      setUser(null);
-      setIsAuthenticated(false);
-    }
-  }, [session]);
 
   const login = async () => {
     try {

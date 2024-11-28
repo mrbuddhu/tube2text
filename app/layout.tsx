@@ -1,10 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
-import { Toaster } from 'react-hot-toast';
-import { AuthProvider } from './context/AuthContext';
-import Navbar from './components/Navbar';
-import { SessionProvider } from 'next-auth/react';
+import ClientLayout from './components/ClientLayout';
 import Script from 'next/script';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -28,15 +25,7 @@ export default function RootLayout({
         />
       </head>
       <body className={inter.className}>
-        <SessionProvider>
-          <AuthProvider>
-            <div className="min-h-screen bg-gray-50">
-              <Navbar />
-              <Toaster position="top-right" />
-              <main>{children}</main>
-            </div>
-          </AuthProvider>
-        </SessionProvider>
+        <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
   );
