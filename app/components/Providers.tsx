@@ -1,16 +1,16 @@
 'use client';
 
-import { SessionProvider } from 'next-auth/react';
+import { ClerkProvider } from '@clerk/nextjs';
 import { AuthProvider } from '../context/AuthContext';
 import { Toaster } from 'react-hot-toast';
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <SessionProvider>
+    <ClerkProvider>
       <AuthProvider>
         <Toaster position="top-right" />
         {children}
       </AuthProvider>
-    </SessionProvider>
+    </ClerkProvider>
   );
 }

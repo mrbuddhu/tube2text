@@ -1,17 +1,9 @@
-import { withAuth } from 'next-auth/middleware';
+import { authMiddleware } from "@clerk/nextjs";
 
-export default withAuth({
-  callbacks: {
-    authorized({ req, token }) {
-      const { pathname } = req.nextUrl;
-      if (pathname.startsWith('/dashboard')) {
-        return !!token;
-      }
-      return true;
-    },
-  },
+export default authMiddleware({
+  publicRoutes: ["/", "/pricing", "/api/webhook"],
 });
 
 export const config = {
-  matcher: ['/dashboard/:path*'],
+  matcher: ["/((?!.+\\.[\\w]+$|_next).*)", "/", "/(api|trpc)(.*)"],
 };

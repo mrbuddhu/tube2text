@@ -1,14 +1,17 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import { ClerkProvider } from '@clerk/nextjs';
+import { ThemeProvider } from '@/components/theme-provider';
+import { Shell } from '@/components/ui/shell';
+import { Toaster } from '@/components/ui/toaster';
+import { SubscriptionProvider } from '@/context/subscription-context';
 import './globals.css';
-import ClientLayout from './components/ClientLayout';
-import Script from 'next/script';
 
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Tube2Text - Convert YouTube Videos to Articles',
-  description: 'Transform any YouTube video into a readable article with AI-powered transcription and formatting.',
+  title: 'Tube2Text - Convert YouTube Videos to Text',
+  description: 'Transform YouTube videos into readable articles in seconds using AI',
 };
 
 export default function RootLayout({
@@ -17,16 +20,24 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <head>
-        <Script 
-          src="https://www.paypal.com/sdk/js?client-id=YOUR_PAYPAL_CLIENT_ID&currency=USD"
-          strategy="afterInteractive"
-        />
-      </head>
-      <body className={inter.className}>
-        <ClientLayout>{children}</ClientLayout>
+    <html lang="en" suppressHydrationWarning>
+      <body>
+        <ClerkProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <SubscriptionProvider>
+              <Shell>
+                {children}
+              </Shell>
+            </SubscriptionProvider>
+          </ThemeProvider>
+          <Toaster />
+        </ClerkProvider>
       </body>
     </html>
-  );
+  )
 }

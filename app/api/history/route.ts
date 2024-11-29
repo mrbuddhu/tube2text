@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { auth } from '@/app/api/auth/[...nextauth]/route';
 
 // In-memory storage (replace with database in production)
 const userHistory = new Map<string, Array<{
@@ -12,81 +11,87 @@ const userHistory = new Map<string, Array<{
 }>>();
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
+  const session = await auth();
+  if (!session || !session.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const history = userHistory.get(session.user.email) || [];
+  const history = userHistory.get(session.user.id) || [];
   return NextResponse.json(history);
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
+  const session = await auth();
+  if (!session || !session.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
     const { title, url, wordCount } = await req.json();
-    
+
     if (!title || !url) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Title and URL are required' },
         { status: 400 }
       );
     }
 
-    const newEntry = {
-      id: Math.random().toString(36).substr(2, 9),
+    const userId = session.user.id;
+    const userRecords = userHistory.get(userId) || [];
+
+    const newRecord = {
+      id: crypto.randomUUID(),
       title,
       url,
       processedAt: new Date().toISOString(),
-      wordCount: wordCount || 0,
+      wordCount: wordCount || 0
     };
 
-    const userEmail = session.user.email;
-    const history = userHistory.get(userEmail) || [];
-    
-    // Keep only last 50 entries
-    if (history.length >= 50) {
-      history.pop();
-    }
-    
-    history.unshift(newEntry);
-    userHistory.set(userEmail, history);
+    // Add to beginning of array (most recent first)
+    userRecords.unshift(newRecord);
 
-    return NextResponse.json(newEntry);
+    // Keep only last 100 records
+    if (userRecords.length > 100) {
+      userRecords.pop();
+    }
+
+    userHistory.set(userId, userRecords);
+    return NextResponse.json(newRecord);
   } catch (error) {
-    console.error('History update error:', error);
+    console.error('Error saving history:', error);
     return NextResponse.json(
-      { error: 'Failed to update history' },
+      { error: 'Failed to save history' },
       { status: 500 }
     );
   }
 }
 
 export async function DELETE(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
+  const session = await auth();
+  if (!session || !session.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { searchParams } = new URL(req.url);
-  const id = searchParams.get('id');
+  try {
+    const { id } = await req.json();
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Record ID is required' },
+        { status: 400 }
+      );
+    }
 
-  if (!id) {
+    const userId = session.user.id;
+    const userRecords = userHistory.get(userId) || [];
+    const updatedRecords = userRecords.filter(record => record.id !== id);
+    userHistory.set(userId, updatedRecords);
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting history:', error);
     return NextResponse.json(
-      { error: 'Missing entry ID' },
-      { status: 400 }
+      { error: 'Failed to delete history' },
+      { status: 500 }
     );
   }
-
-  const userEmail = session.user.email;
-  const history = userHistory.get(userEmail) || [];
-  
-  const newHistory = history.filter(entry => entry.id !== id);
-  userHistory.set(userEmail, newHistory);
-
-  return NextResponse.json({ success: true });
 }

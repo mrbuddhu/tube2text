@@ -30,13 +30,19 @@ export default function TrustBadges() {
       description: 'Start free, upgrade when ready',
     },
     {
-      name: 'Money Back',
-      icon: (
-        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3" />
-        </svg>
-      ),
-      description: '30-day satisfaction guarantee',
+      icon: '🔒',
+      name: 'Secure',
+      description: 'Enterprise-grade security',
+    },
+    {
+      icon: '⚡',
+      name: 'Fast',
+      description: 'Instant AI processing',
+    },
+    {
+      icon: '🌟',
+      name: 'Premium',
+      description: 'High-quality outputs',
     },
   ];
 

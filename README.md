@@ -1,76 +1,108 @@
-# Tube2Article
+# Tube2Text - AI-Powered Video Content Platform
 
-A web application that transforms YouTube videos into readable articles by extracting and processing video content.
+Transform YouTube videos into engaging articles and social media content using advanced AI.
 
 ## Features
 
-- YouTube video URL input
-- Video transcription generation
-- AI-powered article conversion from transcription
-- Article preview and editing capabilities
-- One-click article export/download
-- History of previous conversions
+- YouTube Video Processing
+- AI-Powered Transcription
+- Article Generation
+- Social Media Content Creation
+- Analytics Dashboard
+- Content Templates
+- Writing Styles System
+- Export in Multiple Formats
 
 ## Getting Started
 
-1. Install dependencies:
-```bash
-npm install
-```
-
-2. Run the development server:
-```bash
-npm run dev
-```
-
-3. Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-## Tech Stack
-
-- Next.js 13+ with App Router
-- TypeScript
-- Tailwind CSS
-- YouTube Data API (coming soon)
-- OpenAI API (coming soon)
-
-## Payment Integration
-
-One-time payment via PayPal.me at mrbuddhu1
-
-## Deployment
-
 ### Prerequisites
-- Create OAuth credentials in Google Cloud Console
-- Obtain YouTube Data API key
-- Set up Vercel account
 
-### Environment Variables
-1. Copy `.env.local.example` to `.env.local`
-2. Fill in the following variables:
-   - `NEXTAUTH_SECRET`: Generate using `openssl rand -base64 32`
-   - `GOOGLE_CLIENT_ID`: From Google Cloud Console
-   - `GOOGLE_CLIENT_SECRET`: From Google Cloud Console
-   - `YOUTUBE_API_KEY`: From Google Cloud Console
+- Node.js 18+ and npm
+- A YouTube API key
+- A Clerk account for authentication
+- Environment variables set up (see below)
 
-### Deployment Steps
-1. Push to GitHub
-2. Connect Vercel to your GitHub repository
-3. Set environment variables in Vercel project settings
+### Installation
 
-### Local Development
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/tube2text.git
+cd tube2text
+```
+
+2. Install dependencies:
 ```bash
 npm install
+```
+
+3. Set up environment variables:
+- Copy `.env.example` to `.env.local`
+- Fill in all required environment variables
+
+4. Run the development server:
+```bash
 npm run dev
 ```
 
-## Future Features
+### Production Deployment
 
-- Subscription-based access to premium features
-- Enhanced article customization options
-- Enhanced preview and editing capabilities
-- Enhanced export/download capabilities
-- Enhanced history of previous conversions
-- Enhanced video transcription generation
-- Enhanced AI-powered article conversion
-- Enhanced payment integration
-- Enhanced user account management
+1. Build the application:
+```bash
+npm run build
+```
+
+2. Start the production server:
+```bash
+npm start
+```
+
+## Environment Variables
+
+Required environment variables for production:
+
+```env
+# App Configuration
+NEXT_PUBLIC_APP_URL=https://your-domain.com
+NODE_ENV=production
+
+# Authentication (Clerk)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+CLERK_SECRET_KEY=your_clerk_secret_key
+
+# YouTube API
+YOUTUBE_API_KEY=your_youtube_api_key
+
+# Analytics
+NEXT_PUBLIC_ANALYTICS_ID=your_analytics_id
+```
+
+## Testing
+
+Run the test suite:
+```bash
+npm run test
+```
+
+## Documentation
+
+- [User Guide](docs/USER_GUIDE.md)
+- [API Documentation](docs/API.md)
+- [Contributing Guide](CONTRIBUTING.md)
+
+## Legal
+
+- [Privacy Policy](legal/PRIVACY_POLICY.md)
+- [Terms of Service](legal/TERMS_OF_SERVICE.md)
+- [Cookie Policy](legal/COOKIE_POLICY.md)
+
+## Security
+
+Report security vulnerabilities to security@yourdomain.com
+
+## Support
+
+For support, email support@yourdomain.com
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

@@ -1,17 +1,6 @@
 import NextAuth from 'next-auth';
-import GoogleProvider from 'next-auth/providers/google';
+import { authConfig } from '@/auth.config';
 
-const handler = NextAuth({
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_ID!,
-      clientSecret: process.env.GOOGLE_SECRET!,
-    }),
-  ],
-  pages: {
-    signIn: '/login',
-  },
-  secret: process.env.NEXTAUTH_SECRET,
-});
+const { handlers: { GET, POST }, auth, signIn, signOut } = NextAuth(authConfig);
 
-export { handler as GET, handler as POST };
+export { GET, POST, auth, signIn, signOut };

@@ -1,8 +1,8 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext } from 'react';
+import { useAuth as useClerkAuth, useUser } from '@clerk/nextjs';
 import { toast } from 'react-hot-toast';
-import { signIn, signOut } from '../../auth';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -20,12 +20,18 @@ interface User {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
+  const { isLoaded, userId } = useClerkAuth();
+  const { user: clerkUser } = useUser();
+
+  const user: User | null = clerkUser ? {
+    email: clerkUser.emailAddresses[0]?.emailAddress || '',
+    name: clerkUser.fullName || '',
+    image: clerkUser.imageUrl || '',
+  } : null;
 
   const login = async () => {
     try {
-      await signIn('google', { callbackUrl: '/dashboard' });
+      window.location.href = '/sign-in';
     } catch (error) {
       toast.error('Login failed. Please try again.');
       throw error;
@@ -34,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      await signOut({ callbackUrl: '/' });
+      window.location.href = '/sign-out';
       toast.success('Logged out successfully');
     } catch (error) {
       toast.error('Logout failed. Please try again.');
@@ -43,7 +49,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, login, logout }}>
+    <AuthContext.Provider value={{ 
+      isAuthenticated: !!userId, 
+      user, 
+      login, 
+      logout 
+    }}>
       {children}
     </AuthContext.Provider>
   );

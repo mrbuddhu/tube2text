@@ -3,6 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
+import { PaymentVerificationPanel } from '@/components/admin/PaymentVerification';
 
 interface UsageStats {
   totalUsers: number;
@@ -212,6 +213,11 @@ export default function AdminDashboard() {
               </ul>
             </div>
           </div>
+        </div>
+
+        {/* Payment Verifications */}
+        <div className="mt-8">
+          <PaymentVerificationPanel />
         </div>
       </div>
     </div>

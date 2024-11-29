@@ -18,7 +18,7 @@ export default function Testimonials() {
       name: 'Emily Rodriguez',
       role: 'Digital Marketer',
       image: 'https://i.pravatar.cc/150?img=3',
-      quote: 'No credit card needed to start, and the money-back guarantee made it risk-free to try Pro. Now I can\'t imagine my content workflow without it.',
+      quote: 'The free trial let me experience the power of AI transcription firsthand. Now I can\'t imagine my content workflow without it.',
     },
   ];
 
