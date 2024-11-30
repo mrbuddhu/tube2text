@@ -11,7 +11,7 @@ const navigation = [
   { name: 'Pricing', href: '#pricing' },
 ];
 
-export default function Header() {
+export const Header: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { isAuthenticated, signOut } = useAuth();
@@ -152,4 +152,4 @@ export default function Header() {
       </Dialog>
     </header>
   );
-}
+};

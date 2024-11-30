@@ -18,11 +18,17 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Client for public queries (limited access)
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabaseClient = supabase;
 
-// Admin client for server-side operations (full access)
+// Admin client with elevated privileges (use carefully)
 export const supabaseAdmin = supabaseServiceRoleKey 
-  ? createClient(supabaseUrl, supabaseServiceRoleKey)
-  : supabase;
+  ? createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    })
+  : null;
 
 export type Json =
   | string

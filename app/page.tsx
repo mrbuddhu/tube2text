@@ -1,5 +1,10 @@
 import { Metadata } from 'next';
-import { HomePageClient } from './components/HomePageClient';
+import { Header } from './components/Header';
+import { Hero } from './components/Hero';
+import { Features } from './components/Features';
+import { Pricing } from './components/Pricing';
+import { FAQ } from './components/FAQ';
+import { Footer } from './components/Footer';
 
 export const metadata: Metadata = {
   title: 'Tube2Text - Transform YouTube Videos into Articles',
@@ -28,6 +33,17 @@ export const metadata: Metadata = {
   },
 };
 
-export default function HomePage() {
-  return <HomePageClient />;
+export default function Home() {
+  return (
+    <div className="bg-white">
+      <Header />
+      <main>
+        <Hero />
+        <Features />
+        <Pricing />
+        <FAQ />
+      </main>
+      <Footer />
+    </div>
+  );
 }

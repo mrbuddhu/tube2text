@@ -1,20 +1,18 @@
 'use client';
 
 import { useAuth } from "@clerk/nextjs";
-import { useAnalytics } from '../../lib/hooks/useAnalytics';
-import { useSmartLoading } from '../../lib/hooks/useSmartLoading';
-import { useOffline } from '../../lib/hooks/useOffline';
-import { usePerformance } from '../../lib/hooks/usePerformance';
-import { useDevice } from '../../lib/hooks/useDevice';
-import { usePrefetch } from '../../lib/hooks/usePrefetch';
+import { useAnalytics } from '@/lib/hooks/useAnalytics';
+import { useSmartLoading } from '@/lib/hooks/useSmartLoading';
+import { useOffline } from '@/lib/hooks/useOffline';
+import { useDevice } from '@/lib/hooks/useDevice';
+import { usePrefetch } from '@/lib/hooks/usePrefetch';
 import { TranscriptionForm } from './TranscriptionForm';
 import { Features } from './Features';
 import { PricingPlans } from './PricingPlans';
 import { Header } from './Header';
 import { Footer } from './Footer';
-import { Analytics } from './Analytics';
-import { ErrorBoundary } from './ui/error-boundary';
-import { LoadingSpinner } from './ui/loading-spinner';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 export function HomePageClient() {
   const { isSignedIn } = useAuth();
@@ -47,7 +45,6 @@ export function HomePageClient() {
             <Features />
             <PricingPlans />
             <Footer />
-            <Analytics />
           </>
         )}
       </main>

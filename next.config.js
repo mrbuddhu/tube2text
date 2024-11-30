@@ -3,26 +3,35 @@ const nextConfig = {
   images: {
     domains: ['lh3.googleusercontent.com', 'img.youtube.com'],
   },
-  webpack: (config) => {
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      fs: false,
-      net: false,
-      tls: false,
-    };
+  webpack: (config, { isServer }) => {
+    // Handle native modules
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+        child_process: false,
+        worker_threads: false,
+        bufferutil: false,
+        'utf-8-validate': false,
+      };
+    }
     return config;
   },
   experimental: {
     serverActions: true,
   },
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: true, // Temporarily ignore TS errors for deployment
   },
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: true, // Temporarily ignore ESLint errors for deployment
   },
   swcMinify: true,
+  poweredByHeader: false,
   reactStrictMode: true,
+  compress: true,
   output: 'standalone',
   env: {
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,

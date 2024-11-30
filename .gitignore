@@ -26,9 +26,10 @@ yarn-error.log*
 
 # local env files
 .env
-.env*.local
-.env.production
-.env.development
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # vercel
 .vercel
@@ -38,7 +39,8 @@ yarn-error.log*
 next-env.d.ts
 
 # IDE
-.idea/
 .vscode/
+.idea/
 
-.vercel
+# Supabase
+/supabase/.temp

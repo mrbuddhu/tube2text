@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
-export default function Footer() {
+export const Footer: React.FC = () => {
   const [email, setEmail] = useState('');
   const [feedback, setFeedback] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -126,19 +126,10 @@ export default function Footer() {
         {/* Copyright */}
         <div className="mt-12 border-t border-gray-100 pt-8">
           <p className="text-xs leading-5 text-gray-500">
-            &copy; {currentYear} Built at{' '}
-            <a
-              href="https://www.sanganak.org"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-indigo-600 hover:text-indigo-500 transition-colors"
-            >
-              Sanganak
-            </a>
-            . All rights reserved.
+            &copy; {currentYear} Tube2Text. All rights reserved.
           </p>
         </div>
       </div>
     </footer>
   );
-}
+};
