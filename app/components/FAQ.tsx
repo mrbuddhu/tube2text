@@ -1,44 +1,43 @@
 'use client';
 
-import { Disclosure } from '@headlessui/react';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 
 const faqs = [
   {
-    question: 'How accurate is the transcription?',
+    question: 'How does Tube2Text work?',
     answer:
-      'Our AI-powered transcription system achieves over 95% accuracy for clear audio in English. For other languages and videos with background noise, accuracy may vary but typically remains above 90%.',
+      'Tube2Text uses advanced AI to transcribe and process YouTube videos. Simply paste a YouTube URL, and we will generate high-quality text content from the video.',
   },
   {
-    question: 'What video lengths are supported?',
+    question: 'What are credits and how do they work?',
     answer:
-      'Free users can transcribe videos up to 30 minutes in length. Pro users can transcribe videos up to 2 hours, and Enterprise users have custom limits based on their needs.',
-  },
-  {
-    question: 'Which languages are supported?',
-    answer:
-      'We currently support transcription for 30+ languages including English, Spanish, French, German, Chinese, Japanese, and more. The full list is available in our documentation.',
-  },
-  {
-    question: 'Can I edit the transcribed text?',
-    answer:
-      'Yes, all transcribed text can be edited in our web editor. Pro users also have access to advanced formatting tools and AI-powered editing suggestions.',
-  },
-  {
-    question: 'How is my data protected?',
-    answer:
-      'We use industry-standard encryption for all data in transit and at rest. Your transcriptions are private by default and can only be accessed by you and team members you explicitly share them with.',
+      'Credits are our payment system. Each video processing costs 1 credit. You can purchase credits through our various plans, and they never expire.',
   },
   {
     question: 'What happens if I exceed my plan limits?',
     answer:
-      'If you reach your monthly limit, you can upgrade your plan at any time. We'll notify you when you're approaching your limit so you can plan accordingly.',
+      'If you reach your monthly limit, you can upgrade your plan at any time. We will notify you when you are approaching your limit so you can plan accordingly.',
+  },
+  {
+    question: 'How do I purchase more credits?',
+    answer:
+      'Click on any plan in our pricing section, complete the PayPal payment, and email us your transaction ID. We will add credits to your account within 24 hours.',
+  },
+  {
+    question: 'What payment methods do you accept?',
+    answer:
+      'We currently accept PayPal for all payments. This ensures secure and reliable transactions for our users worldwide.',
+  },
+  {
+    question: 'How long does it take to process a video?',
+    answer:
+      'Processing time depends on the video length and complexity. Most videos are processed within 5-10 minutes.',
   },
 ];
 
-export const FAQ: React.FC = () => {
+export default function FAQ() {
   return (
-    <section id="faq" className="py-24 bg-white">
+    <div className="bg-white py-16 sm:py-24">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-4xl divide-y divide-gray-900/10">
           <h2 className="text-2xl font-bold leading-10 tracking-tight text-gray-900">
@@ -46,30 +45,18 @@ export const FAQ: React.FC = () => {
           </h2>
           <dl className="mt-10 space-y-6 divide-y divide-gray-900/10">
             {faqs.map((faq) => (
-              <Disclosure as="div" key={faq.question} className="pt-6">
-                {({ open }) => (
-                  <>
-                    <dt>
-                      <Disclosure.Button className="flex w-full items-start justify-between text-left text-gray-900">
-                        <span className="text-base font-semibold leading-7">{faq.question}</span>
-                        <span className="ml-6 flex h-7 items-center">
-                          <ChevronDownIcon
-                            className={`h-6 w-6 ${open ? 'rotate-180' : ''} transition-transform`}
-                            aria-hidden="true"
-                          />
-                        </span>
-                      </Disclosure.Button>
-                    </dt>
-                    <Disclosure.Panel as="dd" className="mt-2 pr-12">
-                      <p className="text-base leading-7 text-gray-600">{faq.answer}</p>
-                    </Disclosure.Panel>
-                  </>
-                )}
-              </Disclosure>
+              <div key={faq.question} className="pt-6">
+                <dt className="text-lg font-semibold leading-7 text-gray-900">
+                  {faq.question}
+                </dt>
+                <dd className="mt-2 text-base leading-7 text-gray-600">
+                  {faq.answer}
+                </dd>
+              </div>
             ))}
           </dl>
         </div>
       </div>
-    </section>
+    </div>
   );
-};
+}

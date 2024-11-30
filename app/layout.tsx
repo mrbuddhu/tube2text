@@ -1,17 +1,14 @@
-import type { Metadata } from 'next';
+import './globals.css';
 import { Inter } from 'next/font/google';
 import { ClerkProvider } from '@clerk/nextjs';
-import { ThemeProvider } from '@/components/theme-provider';
-import { Shell } from '@/components/ui/shell';
-import { Toaster } from '@/components/ui/toaster';
-import { SubscriptionProvider } from '@/context/subscription-context';
-import './globals.css';
+import { ThemeProvider } from './components/theme-provider';
+import { Toaster } from './components/ui/toaster';
 
 const inter = Inter({ subsets: ['latin'] });
 
-export const metadata: Metadata = {
-  title: 'Tube2Text - Convert YouTube Videos to Text',
-  description: 'Transform YouTube videos into readable articles in seconds using AI',
+export const metadata = {
+  title: 'Tube2Text - YouTube Video to Text Converter',
+  description: 'Convert YouTube videos to text with AI-powered transcription and formatting.',
 };
 
 export default function RootLayout({
@@ -20,24 +17,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body>
-        <ClerkProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <SubscriptionProvider>
-              <Shell>
-                {children}
-              </Shell>
-            </SubscriptionProvider>
+    <ClerkProvider>
+      <html lang="en" suppressHydrationWarning>
+        <body className={inter.className}>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+            {children}
+            <Toaster />
           </ThemeProvider>
-          <Toaster />
-        </ClerkProvider>
-      </body>
-    </html>
-  )
+        </body>
+      </html>
+    </ClerkProvider>
+  );
 }
